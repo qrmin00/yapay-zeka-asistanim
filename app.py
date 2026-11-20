@@ -42,13 +42,6 @@ st.markdown("""
     box-shadow: 0 8px 25px #e88abd44;
 }
 
-.chat-area {
-    background: rgba(255,255,255,0.55);
-    border: 1px solid #ffb8dc;
-    border-radius: 22px;
-    padding: 15px;
-}
-
 h1, h2, h3, p {
     color: #a52a69;
 }
@@ -111,4 +104,75 @@ if "mesajlar" not in st.session_state:
 
 for m in st.session_state.mesajlar:
     with st.chat_message(m["rol"]):
-        for r in
+        for r in m["resimler"]:
+            st.image(r, width=300)
+
+        st.write(m["metin"])
+
+# Mesaj alanı
+girdi = st.chat_input(
+    "Bir şey yaz veya fotoğraf ekle... 💗",
+    accept_file=True,
+    file_type=["jpg", "jpeg", "png", "webp"]
+)
+
+if girdi:
+    soru = girdi.text or ""
+    resimler = [kucult(d) for d in girdi.files]
+
+    if not soru and resimler:
+        soru = "Bu fotoğrafı analiz et. Fotoğrafta hiçbir değişiklik yapma."
+
+    st.session_state.mesajlar.append({
+        "rol": "user",
+        "metin": soru,
+        "resimler": resimler
+    })
+
+    with st.chat_message("user"):
+        for r in resimler:
+            st.image(r, width=300)
+
+        st.write(soru)
+
+    gecmis = []
+
+    for m in st.session_state.mesajlar:
+        parcalar = [
+            types.Part.from_bytes(
+                data=r,
+                mime_type="image/jpeg"
+            )
+            for r in m["resimler"]
+        ]
+
+        parcalar.append(
+            types.Part.from_text(text=m["metin"])
+        )
+
+        rol = "user" if m["rol"] == "user" else "model"
+
+        gecmis.append(
+            types.Content(role=rol, parts=parcalar)
+        )
+
+    with st.chat_message("assistant"):
+        with st.spinner("Düşünüyorum... 💗"):
+            try:
+                cevap = client.models.generate_content(
+                    model=MODEL,
+                    contents=gecmis
+                )
+
+                metin = cevap.text or "Bir cevap oluşturamadım."
+
+            except Exception as hata:
+                metin = "Bir hata oluştu: " + str(hata)
+
+        st.write(metin)
+
+    st.session_state.mesajlar.append({
+        "rol": "assistant",
+        "metin": metin,
+        "resimler": []
+    })
